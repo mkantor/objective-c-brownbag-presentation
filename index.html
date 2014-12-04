@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Objective‑C</title>
+    <style>
+      #objective-c-brownbag h1 {
+        margin: 0.7em 0;
+      }
+      #objective-c-brownbag h2 {
+        margin: 0.8em 0;
+      }
+      #objective-c-brownbag h3 {
+        margin: 0.9em 0;
+      }
+      #objective-c-brownbag h4,
+      #objective-c-brownbag h5,
+      #objective-c-brownbag h6 {
+        margin: 1em 0;
+      }
+      #objective-c-brownbag code.remark-code {
+        font-size: 12px;
+      }
+      #objective-c-brownbag .remark-slide-scaler {
+        overflow: auto;
+      }
+      #objective-c-brownbag .remark-slide-content {
+        padding: 0em 2.5em;
+      }
+    </style>
+  </head>
+  <body id="objective-c-brownbag">
+    <textarea id="source">
+
+
+
+
+
+class: center, middle
+
+![Objective‑C: WTF?](/images/objective-c-wtf.jpg)
+
+## or: How I Learned to Stop Worrying and Love the Brackets
+
+
+---
+
+
+# Objective‑C is...
+
+- A strict superset of C (along the same lines as C++, but actually 
+  [moreso](http://stackoverflow.com/questions/19366134/what-does-objective-c-is-a-superset-of-c-more-strictly-than-c-mean-exactly):
+  every valid C program is a valid Objective‑C program).
+- Statically typed.
+  - But lacking generics, algebraic data types, and other features of "modern" 
+    type systems.
+- A fancy runtime.
+  - Allows for metaprogramming: asking an object what messages it responds to 
+    at runtime, forwarding messages to other objects on the fly, etc.
+  - Normally we don't do this sort of thing, but some of Apple's libraries use 
+    it to great effect, and it can be very handy for unit tests, debugging, etc.
+- Pretty portable despite only being commonly used in the Appleverse.
+  - Can be compiled by LLVM and GCC on most operating systems.
+  - The runtime is [open 
+    source](http://www.opensource.apple.com/source/objc4/objc4-437.1/runtime/objc-runtime.m).
+- A language that uses *[message 
+  passing](http://en.wikipedia.org/wiki/Message_passing)* instead of direct 
+  method dispatch.
+  - So, more like Smalltalk than Java and more like Ruby than JavaScript.
+- Verbose and cryptic (until you get the hang of it):
+    ```objc
+    NSString *newString = [oldString stringByReplacingOccurrencesOfString:@"foo"
+                                                               withString:@"bar"
+                                                                  options:NSCaseInsensitiveSearch
+                                                                    range:NSMakeRange(0, 10)];
+    ```
+
+
+---
+
+
+class: center, middle
+
+# Example program
+
+## An overly-complicated Hello World
+
+
+---
+
+
+## main.m
+
+```objc
+#import <Foundation/Foundation.h>
+#import "KBMGreeter.h"
+
+int main(int argc, const char * argv[]) {
+    @autoreleasepool {
+        KBMGreeter *greeter = [[KBMGreeter alloc] initWithGreeting:@"Bonjour"];
+        [greeter askForName];
+        [greeter greet];
+    }
+    return 0;
+}
+```
+
+
+---
+
+
+## KBMGreeter.h
+
+```objc
+#import <Foundation/Foundation.h>
+
+/**
+ * The KBMGreeter class is responsible for greeting users. Note that it is
+ * mutable and handles I/O directly.
+ */
+@interface KBMGreeter : NSObject
+
+/**
+ * Name of the user to greet.
+ */
+@property NSString *userName;
+
+/**
+ * Returns an initialized KBMGreeter object with the specified greeting.
+ *
+ * @param greeting How to greet the user.
+ * @return greeting An initialized KBMGreeter object.
+ */
+- (instancetype)initWithGreeting:(NSString *)greeting;
+
+/**
+ * Prompts the user for their name and reads it directly from standard input.
+ */
+- (void)askForName;
+
+/**
+ * Print the greeting to standard output.
+ */
+- (void)greet;
+
+@end
+```
+
+
+---
+
+
+## KBMGreeter.m
+
+```objc
+#import "KBMGreeter.h"
+
+@interface KBMGreeter ()
+
+@property NSString *greeting;
+@property NSFileHandle *input;
+@property NSFileHandle *output;
+
+@end
+
+@implementation KBMGreeter
+
+- (instancetype)init {
+    return [self initWithGreeting:@"Hello"];
+}
+
+- (instancetype)initWithGreeting:(NSString *)greeting {
+    if (self = [super init]) {
+        self.greeting = greeting;
+        self.userName = @"you beautiful thing";
+        self.input = [NSFileHandle fileHandleWithStandardInput];
+        self.output = [NSFileHandle fileHandleWithStandardOutput];
+    }
+    return self;
+}
+
+- (void)askForName {
+    [self writeToOutput:@"What is your name?\n"];
+    self.userName = [self readFromInput];
+}
+
+- (void)greet {
+    NSString *personalizedGreeting = [NSString stringWithFormat:@"%@, %@!\n", self.greeting, self.userName];
+    [self writeToOutput:personalizedGreeting];
+}
+
+- (void)writeToOutput:(NSString *)string {
+    [self.output writeData:[string dataUsingEncoding:NSUTF8StringEncoding]];
+}
+
+- (NSString *)readFromInput {
+    NSData *inputData = [self.input availableData];
+    NSString *inputString = [[NSString alloc] initWithData:inputData encoding:NSUTF8StringEncoding];
+    return [inputString stringByTrimmingCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+}
+
+@end
+```
+
+
+---
+
+
+class: center, middle
+
+# Some things that make Objective‑C special
+
+## (and/or "special")
+
+
+---
+
+
+## [Initializers](https://developer.apple.com/library/ios/documentation/General/Conceptual/CocoaEncyclopedia/Initialization/Initialization.html) (are basically constructors)
+
+The first message you pass to a class to get an object is `alloc`.
+
+```objc
+[SomeClass alloc];
+```
+
+But at this point it's pretty useless; you need to initialize it:
+
+```objc
+[[SomeClass alloc] init];
+```
+
+Now the object is ready to use. It has its instance variables set to default 
+values and has configured any shared resources it may need (caches, filesystem 
+handles, etc).
+
+
+---
+
+
+## More complicated initializers
+
+Initializers may take arguments:
+
+```objc
+[[UIColor alloc] initWithRed:0.5 green:0.1 blue:0.3 alpha:0];
+```
+
+And objects may have multiple initializers which accept different sets of 
+arguments.
+
+#### Rules of thumb for initializer implementation
+
+- Always invoke the superclass (super) initializer first.
+- Return `nil` to the receiver if anything goes wrong.
+- If an object has multiple initializers, the one with the most flexibility 
+  should be the *designated initializer* and other initializers should be 
+  shortcuts for it.
+
+```objc
+- (id)initWithTitle:(NSString *)title date:(NSDate *)date {
+    if (self = [super init]) {
+        self.title = title;
+        self.date = date;
+    }
+    return self;
+}
+
+- (id)initWithTitle:(NSString *)title {
+    return [self initWithTitle:title date:[NSDate date]];
+}
+
+- (id)init {
+    return [self initWithTitle:@"Task"];
+}
+```
+
+
+---
+
+
+## Memory "management" (ARC)
+
+ARC stands for *[automatic reference 
+counting](http://en.wikipedia.org/wiki/Automatic_Reference_Counting)*. When 
+enabled at compile time it supports a (limited) form of garbage collection.
+
+All objects have a *retain count* to track how many other objects are 
+interested in it. Once the retain count reaches 0 it should be safe to 
+deallocate the object.
+
+Without ARC, programmers send explicit `retain` and `release` messages to 
+objects to manage retain counts. ARC inserts these for you, but it does **not** 
+handle cyclical references and other nontrivial scenarios.
+
+
+---
+
+
+## Blocks
+
+[Blocks](https://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/ProgrammingWithObjectiveC/WorkingwithBlocks/WorkingwithBlocks.html) 
+are anonymous functions.
+
+As in other languages that support functions-as-objects, they're often used for 
+callbacks and other asynchronous behavior.
+
+Blocks are 
+[closures](http://en.wikipedia.org/wiki/Closure_%28computer_programming%29), 
+but external variables are captured by value (and are read-only) unless 
+specified otherwise.
+
+The [syntax for blocks](http://fuckingblocksyntax.com/) is arcane and differs 
+depending on the context in which you're defining a block. Blocks are 
+strongly-typed (their type is defined by argument types and the return type).
+
+#### Example
+
+```objc
+HungryPerson *bob = [[HungryPerson alloc] initWithName:@"Bob"];
+
+[tacoService orderTacos:3 completionHandler:^(NSArray *tacos, NSError *error) {
+    if (!error) {
+        [bob eatFood:tacos];
+    }
+}];
+```
+
+Order some tacos for Bob and tell him to eat them when they're ready (unless 
+something went wrong).
+
+
+---
+
+
+## Pointers vs. primitives
+
+Like other C-ish languages, Objective‑C has primitive values and pointers. 
+Unlike Java and some other OO languages, there is no concept of auto-boxing. 
+However, there is `@(...)` syntactical sugar for explicit boxing:
+
+```objc
+int meaningOfLife = 42;
+NSNumber *trueMeaningOfLife = @(meaningOfLife);
+```
+
+Somewhat confusingly, `NSNumber` is the box for all types of numbers, 
+booleans, and characters. All of these produce `NSNumber`s:
+```objc
+@(12);
+@(-0.5);
+@(YES); // Note that YES == true; they're mostly interchangeable but YES/NO is idiomatic Objective‑C.
+@('X');
+```
+
+Boxing is useful in many cases, particularly if you want to store primitive 
+values in a collection (Objective‑C's collections can only contain pointers):
+
+```objc
+NSArray *stuff = @[
+  @"foo",
+  @3.14,
+  @YES,
+  100, // This will not compile! It needs to be a pointer.
+];
+```
+
+
+---
+
+
+## Message passing
+
+You don't "call a method" on an object, you "pass a message" to it. In many 
+cases this is a distinction without a difference.
+
+Messages are values of the type `SEL`. You can create a `SEL` with the 
+`@selector(...)` compiler directive. For example:
+
+```objc
+Person *personA = [[Person alloc] init];
+Person *personB = [[Person alloc] init];
+
+SEL action;
+if (personA.nice) {
+    action = @selector(giveACookieTo:);
+} else if (personA.mean) {
+    action = @selector(punchFaceOf:);
+} else {
+    action = @selector(ignore:);
+}
+
+[personA performSelector:action withObject:personB]; // e.g. [personA giveACookieTo:personB]
+```
+
+The compiler will help you out and issue warnings if you use `@selector(...)` 
+to reference a selector that it can't find in any public interfaces, but note 
+that it does not know ahead of time which object will receive this selector, 
+so some errors might not be caught until runtime.
+
+
+---
+
+
+## Other things to keep in mind
+
+- Objective‑C does not have namespaces (that's why you see ugly prefixes on 
+  class names and global variables).
+  - The reserved `NS` prefix stands for 
+    "[NeXTSTEP](https://en.wikipedia.org/wiki/NeXTSTEP)", where most of the 
+    early development of the standard library ("Foundation") happened.
+
+- `nil` eats all messages and always returns `nil`.
+  ```objc
+  id someVariable = nil;
+  [someVariable thisMethodDoesNotExist:true] == nil;
+  ```
+  This avoids null pointer exceptions, but it means you should explicitly check 
+  for `nil`s in some places.
+
+- ["`@`" means "this is a thing that the Objective‑C compiler will 
+  preprocess"](http://nshipster.com/at-compiler-directives/). For example:
+  ```objc
+  @"hello";
+  // is syntax sugar for
+  [NSString stringWithUTF8String:"hello"];
+  ```
+  ```objc
+  @selector(someMessage:withArgument:);
+  // is syntax sugar for
+  sel_registerName("someMessage:withArgument:");
+  ```
+
+
+---
+
+
+# Resources
+
+["Programming with Objective‑C" on the Mac Developer 
+Library](https://developer.apple.com/library/mac/documentation/cocoa/conceptual/ProgrammingWithObjectiveC/Introduction/Introduction.html)  
+The canonical getting started guide. Really informative but quite wordy.
+
+[fuckingblocksyntax.com](http://fuckingblocksyntax.com/)  
+A handy reference since nobody can ever remember all of the block syntax 
+variants.
+
+[NSHipster](http://nshipster.com/)  
+A blog with lots of in-depth yet readable articles about Objective‑C, Swift, 
+and Cocoa.
+
+
+---
+
+
+class: center, middle
+
+![And soon this information will all be useless](/images/swift.jpg)
+
+
+
+
+
+    </textarea>
+    <script src="//gnab.github.io/remark/downloads/remark-latest.min.js"></script>
+    <script>
+      var slideshow = remark.create({
+        navigation: {
+          scroll: false
+        }
+      });
+    </script>
+  </body>
+</html>
