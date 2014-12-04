@@ -15,7 +15,7 @@
  * Returns an initialized KBMGreeter object with the specified greeting.
  *
  * @param greeting How to greet the user.
- * @return greeting An initialized KBMGreeter object.
+ * @return An initialized KBMGreeter object.
  */
 - (instancetype)initWithGreeting:(NSString *)greeting;
 
@@ -25,7 +25,7 @@
 - (void)askForName;
 
 /**
- * Print the greeting to standard output.
+ * Prints the greeting to standard output.
  */
 - (void)greet;
 
