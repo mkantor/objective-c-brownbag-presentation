@@ -293,6 +293,13 @@ Without ARC, programmers send explicit `retain` and `release` messages to
 objects to manage retain counts. ARC inserts these for you, but it does **not** 
 handle cyclical references and other nontrivial scenarios.
 
+A *weak* reference is a pointer to an object that doesn't add to its retain 
+count. They require special care because the object will be deallocated out from 
+under the reference (becoming `nil`) whenever no other references are causing 
+it to be retained. They're often used to avoid *retain cycles* (if two 
+objects strongly reference one another they will both contribute to each 
+others' retain counts and never be deallocated).
+
 
 ---
 
